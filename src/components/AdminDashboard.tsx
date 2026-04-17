@@ -4,37 +4,32 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { db } from "../firebase";
-import { collection, onSnapshot, updateDoc, doc } from "firebase/firestore";
 import { UserProfile, Material, AcademicLevel, UserRole } from "../types";
 import { Users, FileText, Activity, ShieldCheck, GraduationCap, Trophy, ChevronRight, UserPlus, Search } from "lucide-react";
 import { motion } from "motion/react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
+const MOCK_USERS: UserProfile[] = [
+  { uid: "1", name: "Dr. Adebayo", email: "adebayo@mouau.edu.ng", role: "lecturer", level: "N/A", department: "Computer Science", createdAt: new Date().toISOString() },
+  { uid: "2", name: "Chinedu Okafor", email: "chinedu@mouau.edu.ng", role: "student", level: "300L", department: "Computer Science", createdAt: new Date().toISOString() }
+];
+
 export default function AdminDashboard() {
-  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>(MOCK_USERS);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
-    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
-      setUsers(snapshot.docs.map(doc => ({ ...doc.data() } as UserProfile)));
-    });
-    const unsubMaterials = onSnapshot(collection(db, "materials"), (snapshot) => {
-      setMaterials(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Material)));
-    });
-    return () => {
-      unsubUsers();
-      unsubMaterials();
-    };
+    // Mock Data Load
+    setMaterials([]);
   }, []);
 
   const changeRole = async (uid: string, newRole: UserRole) => {
-    await updateDoc(doc(db, "users", uid), { role: newRole });
+    setUsers(prev => prev.map(u => u.uid === uid ? { ...u, role: newRole, level: newRole === 'student' ? '100L' : 'N/A' } as UserProfile : u));
   };
 
   const changeLevel = async (uid: string, newLevel: AcademicLevel) => {
-    await updateDoc(doc(db, "users", uid), { level: newLevel });
+    setUsers(prev => prev.map(u => u.uid === uid ? { ...u, level: newLevel } : u));
   };
 
   const statsByLevel = ["100L", "200L", "300L", "400L", "500L"].map(lvl => ({

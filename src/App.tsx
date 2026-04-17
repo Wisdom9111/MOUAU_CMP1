@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
-import { auth, db } from "./firebase";
-import { onAuthStateChanged, signOut, User } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
 import { UserProfile } from "./types";
-import { GraduationCap, LogOut, BookOpen, Upload, LayoutDashboard, BrainCircuit, Search } from "lucide-react";
+import { GraduationCap, LogOut, BookOpen, Upload, LayoutDashboard, Search } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 import AdminDashboard from "./components/AdminDashboard";
@@ -13,36 +10,30 @@ import StudentArea from "./components/StudentArea";
 import Login from "./components/Auth/Login";
 import SignUp from "./components/Auth/SignUp";
 
+// Unified Auth Logic Mock
+const getStoredUser = () => {
+  const user = localStorage.getItem("mouau_user");
+  return user ? JSON.parse(user) as UserProfile : null;
+};
+
 // Authentication Guard
 function AuthGuard({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<UserProfile | null>(getStoredUser());
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      if (u) {
-        setUser(u);
-        const docRef = doc(db, "users", u.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const p = docSnap.data() as UserProfile;
-          setProfile(p);
-          if (allowedRoles && !allowedRoles.includes(p.role)) {
-            navigate(p.role === 'admin' ? '/admin-dashboard' : p.role === 'lecturer' ? '/lecturer-dashboard' : '/student-dashboard', { replace: true });
-          }
-        } else {
-          if (location.pathname !== '/register') navigate('/register', { replace: true });
-        }
-      } else if (location.pathname !== '/login' && location.pathname !== '/register') {
-        navigate('/login', { replace: true });
+    const user = getStoredUser();
+    if (!user) {
+      if (location.pathname !== '/register') navigate('/login', { replace: true });
+    } else {
+      setProfile(user);
+      if (allowedRoles && !allowedRoles.includes(user.role)) {
+        navigate(user.role === 'admin' ? '/admin-dashboard' : user.role === 'lecturer' ? '/lecturer-dashboard' : '/student-dashboard', { replace: true });
       }
-      setLoading(false);
-    });
-    return unsub;
-  }, [navigate]);
+    }
+  }, [navigate, location.pathname]);
 
   if (loading) return <LoadingScreen />;
   return <Layout profile={profile}>{children}</Layout>;
@@ -54,7 +45,7 @@ function LoadingScreen() {
       <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }}>
         <GraduationCap className="w-12 h-12 text-[#006838]" />
       </motion.div>
-      <p className="mt-4 font-sans text-sm text-[#6B7280]">Verifying Portal Credentials...</p>
+      <p className="mt-4 font-sans text-sm text-[#6B7280]">Connecting to Node...</p>
     </div>
   );
 }
@@ -62,7 +53,11 @@ function LoadingScreen() {
 function Layout({ children, profile }: { children: React.ReactNode, profile: UserProfile | null }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const logout = () => signOut(auth).then(() => navigate('/login'));
+  
+  const logout = () => {
+    localStorage.removeItem("mouau_user");
+    navigate('/login');
+  };
 
   const isLecturer = profile?.role === 'lecturer';
   const isAdmin = profile?.role === 'admin';
@@ -75,7 +70,7 @@ function Layout({ children, profile }: { children: React.ReactNode, profile: Use
             <div className={`${isLecturer ? 'bg-[#008f4c]' : 'bg-[#006838]'} w-10 h-10 rounded-xl flex items-center justify-center font-black text-lg shadow-lg`}>M</div>
             <div>
                <h2 className="font-black text-sm tracking-tighter uppercase">MOUAU CMS</h2>
-               <p className="text-[8px] text-white/40 font-bold tracking-[0.3em] uppercase">Academic Portal</p>
+               <p className="text-[8px] text-white/40 font-bold tracking-[0.3em] uppercase">Vercel Build</p>
             </div>
           </div>
           
@@ -93,32 +88,19 @@ function Layout({ children, profile }: { children: React.ReactNode, profile: Use
                 )}
                 
                 {(isLecturer || isAdmin) ? (
-                  <>
-                    <NavItem 
-                      icon={<Upload size={18} />} 
-                      label="Upload Center" 
-                      active={location.pathname === '/lecturer-dashboard'} 
-                      onClick={() => navigate('/lecturer-dashboard')} 
-                    />
-                    <NavItem 
-                      icon={<BookOpen size={18} />} 
-                      label="Management" 
-                      onClick={() => navigate('/lecturer-dashboard')} 
-                    />
-                  </>
+                  <NavItem 
+                    icon={<Upload size={18} />} 
+                    label="Upload Center" 
+                    active={location.pathname === '/lecturer-dashboard'} 
+                    onClick={() => navigate('/lecturer-dashboard')} 
+                  />
                 ) : (
-                  <>
-                    <NavItem 
-                      icon={<BookOpen size={18} />} 
-                      label="Course Catalog" 
-                      active={location.pathname === '/student-dashboard'} 
-                      onClick={() => navigate('/student-dashboard')} 
-                    />
-                    <NavItem 
-                      icon={<BrainCircuit size={18} />} 
-                      label="Quiz Generator" 
-                    />
-                  </>
+                  <NavItem 
+                    icon={<BookOpen size={18} />} 
+                    label="Course Catalog" 
+                    active={location.pathname === '/student-dashboard'} 
+                    onClick={() => navigate('/student-dashboard')} 
+                  />
                 )}
                 
                 <NavItem icon={<Search size={18} />} label="Global Search" />
@@ -133,11 +115,11 @@ function Layout({ children, profile }: { children: React.ReactNode, profile: Use
               {profile?.name?.charAt(0) || '?'}
             </div>
             <div className="overflow-hidden">
-              <p className="text-[11px] font-black text-white truncate uppercase tracking-tight">{profile?.name || 'Loading User...'}</p>
+              <p className="text-[11px] font-black text-white truncate uppercase tracking-tight">{profile?.name || 'Local User'}</p>
               <div className="flex items-center gap-1.5 mt-0.5">
                  <div className={`w-1.5 h-1.5 rounded-full ${isLecturer ? 'bg-emerald-400' : 'bg-blue-400'} animate-pulse`}></div>
                  <p className="text-[9px] text-white/60 font-black uppercase tracking-[0.15em]">
-                   {profile?.role || 'Identifying...'}
+                   {profile?.role || 'Guest'}
                  </p>
               </div>
             </div>
@@ -146,7 +128,7 @@ function Layout({ children, profile }: { children: React.ReactNode, profile: Use
             onClick={logout} 
             className="w-full flex items-center justify-center gap-3 bg-red-500/10 text-red-400 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all border border-red-500/20"
           >
-            <LogOut size={14} /> BREAK SESSION
+            <LogOut size={14} /> LOGOUT
           </button>
         </div>
       </nav>
@@ -156,18 +138,9 @@ function Layout({ children, profile }: { children: React.ReactNode, profile: Use
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input 
-              placeholder="Search faculty repository..." 
+              placeholder="Search local repository..." 
               className="bg-[#F9FAFB] border border-[#D1D5DB] rounded-lg py-2.5 pl-11 pr-4 text-xs w-[400px] outline-none focus:ring-2 focus:ring-[#006838]/20 transition-all font-medium" 
             />
-          </div>
-          <div className="flex items-center gap-5 text-right">
-            <div className="hidden sm:block">
-              <p className="text-xs font-black text-[#111827] uppercase tracking-tight">{profile?.name}</p>
-              <p className="text-[9px] text-[#6B7280] font-bold uppercase tracking-widest">{profile?.department || 'Faculty of Engineering'}</p>
-            </div>
-            <div className={`w-10 h-10 rounded-full ${isLecturer ? 'bg-[#E6F4EA] text-[#006838]' : 'bg-gray-100 text-gray-600'} flex items-center justify-center font-black text-sm border border-[#D1D5DB]`}>
-              {profile?.name?.charAt(0)}
-            </div>
           </div>
         </header>
         <main className="flex-1 p-10 bg-[#f8fafb]">{children}</main>
@@ -190,46 +163,29 @@ function NavItem({ icon, label, active = false, onClick }: { icon: React.ReactNo
 
 function AuthWrapper({ type }: { type: 'login' | 'signup' }) {
   const navigate = useNavigate();
-  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const docRef = doc(db, "users", user.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const p = docSnap.data() as UserProfile;
-          navigate(p.role === 'admin' ? '/admin-dashboard' : p.role === 'lecturer' ? '/lecturer-dashboard' : '/student-dashboard', { replace: true });
-        }
-      }
-      setChecking(false);
-    });
-    return unsub;
+    const user = getStoredUser();
+    if (user) {
+      navigate(user.role === 'admin' ? '/admin-dashboard' : user.role === 'lecturer' ? '/lecturer-dashboard' : '/student-dashboard', { replace: true });
+    }
   }, [navigate]);
-
-  if (checking) return <LoadingScreen />;
 
   return (
     <AnimatePresence mode="wait">
       {type === 'login' ? (
-        <Login key="login" onSignUpClick={() => navigate('/register')} onSuccess={() => {}} />
+        <Login key="login" onSignUpClick={() => navigate('/register')} onSuccess={() => navigate('/')} />
       ) : (
-        <SignUp key="signup" onLoginClick={() => navigate('/login')} onSuccess={(p) => navigate(p.role === 'lecturer' ? '/lecturer-dashboard' : '/student-dashboard', { replace: true })} />
+        <SignUp key="signup" onLoginClick={() => navigate('/login')} onSuccess={(p) => {
+          localStorage.setItem("mouau_user", JSON.stringify(p));
+          navigate(p.role === 'lecturer' ? '/lecturer-dashboard' : '/student-dashboard', { replace: true });
+        }} />
       )}
     </AnimatePresence>
   );
 }
 
 export default function App() {
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, () => setLoading(false));
-    return unsub;
-  }, []);
-
-  if (loading) return <LoadingScreen />;
-
   return (
     <BrowserRouter>
       <Routes>
@@ -246,7 +202,7 @@ export default function App() {
         
         <Route path="/student-dashboard" element={
           <AuthGuard allowedRoles={['student', 'lecturer', 'admin']}>
-            <StudentAreaWithProfile />
+            <StudentArea profile={getStoredUser()!} />
           </AuthGuard>
         } />
 
@@ -254,27 +210,4 @@ export default function App() {
       </Routes>
     </BrowserRouter>
   );
-}
-
-function StudentAreaWithProfile() {
-  const [p, setP] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      if (u) {
-        const docRef = doc(db, "users", u.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setP(docSnap.data() as UserProfile);
-        }
-      }
-      setLoading(false);
-    });
-    return unsub;
-  }, []);
-
-  if (loading) return <LoadingScreen />;
-  if (!p) return <Navigate to="/login" replace />;
-  return <StudentArea profile={p} />;
 }

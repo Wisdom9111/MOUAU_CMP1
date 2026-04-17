@@ -4,41 +4,41 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { db } from "../firebase";
-import { collection, query, where, onSnapshot, doc, updateDoc, setDoc } from "firebase/firestore";
 import { Material, UserProfile, ReadingHistory, QuizQuestion, AcademicLevel } from "../types";
 import { FileText, Clock, BrainCircuit, Sparkles, X, ChevronRight, Download, BookOpen, User, BookText } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { generateSummary, generateQuiz } from "../services/geminiService";
 
+const MOCK_STUDENT_MATERIALS: Material[] = [
+  {
+    id: "1",
+    title: "CSC 101: Introduction to Computing",
+    description: "Foundational concepts of hardware and software.",
+    fileUrl: "#",
+    level: "100L",
+    semester: "First",
+    lecturerId: "lecturer-1",
+    summary: "This document covers binary systems, CPU architecture, and basic programming concepts.",
+    createdAt: new Date().toISOString()
+  }
+];
+
 export default function StudentArea({ profile }: { profile: UserProfile }) {
-  const [materials, setMaterials] = useState<Material[]>([]);
+  const [materials, setMaterials] = useState<Material[]>(MOCK_STUDENT_MATERIALS);
   const [history, setHistory] = useState<ReadingHistory[]>([]);
   const [selectedLevel, setSelectedLevel] = useState<AcademicLevel>(profile.level as AcademicLevel);
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
 
   useEffect(() => {
-    const q = query(collection(db, "materials"), where("level", "==", selectedLevel));
-    const unsub = onSnapshot(q, (snapshot) => {
-      setMaterials(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Material)));
-    });
-    return unsub;
+    // Mock Filtering
+    const filtered = MOCK_STUDENT_MATERIALS.filter(m => m.level === selectedLevel);
+    setMaterials(filtered);
   }, [selectedLevel]);
 
-  useEffect(() => {
-    const q = query(collection(db, "reading_history"), where("uid", "==", profile.uid));
-    const unsub = onSnapshot(q, (snapshot) => {
-      setHistory(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReadingHistory)));
-    });
-    return unsub;
-  }, [profile.uid]);
-
   const recordViewing = async (materialId: string) => {
-    await setDoc(doc(db, "reading_history", `${profile.uid}_${materialId}`), {
-      uid: profile.uid,
-      materialId: materialId,
-      viewedAt: new Date().toISOString()
-    });
+    if (!history.some(h => h.materialId === materialId)) {
+      setHistory(prev => [...prev, { id: Math.random().toString(), uid: profile.uid, materialId, viewedAt: new Date().toISOString() }]);
+    }
   };
 
   return (
@@ -131,6 +131,7 @@ export default function StudentArea({ profile }: { profile: UserProfile }) {
           <MaterialDetailModal 
             material={selectedMaterial} 
             onClose={() => setSelectedMaterial(null)} 
+            setMaterials={setMaterials}
           />
         )}
       </AnimatePresence>
@@ -170,7 +171,7 @@ function MaterialCard({ material, isViewed, onClick }: { material: Material, isV
   );
 }
 
-function MaterialDetailModal({ material, onClose }: { material: Material, onClose: () => void }) {
+function MaterialDetailModal({ material, onClose, setMaterials }: { material: Material, onClose: () => void, setMaterials: React.Dispatch<React.SetStateAction<Material[]>> }) {
   const [summary, setSummary] = useState(material.summary || "");
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
@@ -184,7 +185,8 @@ function MaterialDetailModal({ material, onClose }: { material: Material, onClos
     try {
       const s = await generateSummary(`${material.title}: ${material.description}`);
       setSummary(s);
-      await updateDoc(doc(db, "materials", material.id), { summary: s });
+      // Mock Update
+      setMaterials(prev => prev.map(m => m.id === material.id ? { ...m, summary: s } : m));
     } catch (e) {
       console.error(e);
     } finally {

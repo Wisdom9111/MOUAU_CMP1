@@ -4,41 +4,31 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { db, auth, storage } from "../firebase";
-import { collection, query, where, onSnapshot, doc, deleteDoc, addDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Material, AcademicLevel } from "../types";
 import { Upload, FileText, Trash2, CheckCircle2, X, Plus, Clock, BrainCircuit, Sparkles, BookCheck, Tags, FileUp } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { onAuthStateChanged } from "firebase/auth";
+
+const MOCK_MATERIALS: Material[] = [
+  {
+    id: "1",
+    title: "CSC 211: Discrete Mathematics",
+    description: "Lecture notes on set theory and logic.",
+    fileUrl: "#",
+    level: "200L",
+    semester: "First",
+    lecturerId: "lecturer-1",
+    createdAt: new Date().toISOString()
+  }
+];
 
 export default function LecturerArea() {
-  const [materials, setMaterials] = useState<Material[]>([]);
+  const [materials, setMaterials] = useState<Material[]>(MOCK_MATERIALS);
   const [isUploading, setIsUploading] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
-  const [user, setUser] = useState<any>(null);
-
-  useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, (u) => {
-      if (u) {
-        setUser(u);
-        const q = query(collection(db, "materials"), where("lecturerId", "==", u.uid));
-        const unsubMaterials = onSnapshot(q, (snapshot) => {
-          setMaterials(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Material)));
-        });
-        return () => unsubMaterials();
-      }
-    });
-    return unsubAuth;
-  }, []);
 
   const deleteMaterial = async (id: string) => {
-    if (confirm("Permanently remove this courseware from the university repository?")) {
-      try {
-        await deleteDoc(doc(db, "materials", id));
-      } catch (e) {
-        console.error("Delete failed:", e);
-      }
+    if (confirm("Permanently remove this courseware?")) {
+      setMaterials(prev => prev.filter(m => m.id !== id));
     }
   };
 
@@ -128,6 +118,7 @@ export default function LecturerArea() {
             onClose={() => setShowUpload(false)} 
             isUploading={isUploading} 
             setIsUploading={setIsUploading} 
+            onSuccess={(m) => setMaterials(prev => [m, ...prev])}
           />
         )}
       </AnimatePresence>
@@ -190,7 +181,12 @@ function LecturerCard({ material, onDelete }: { material: Material, onDelete: ()
   );
 }
 
-function UploadModal({ onClose, isUploading, setIsUploading }: { onClose: () => void, isUploading: boolean, setIsUploading: (b: boolean) => void }) {
+function UploadModal({ onClose, isUploading, setIsUploading, onSuccess }: { 
+  onClose: () => void, 
+  isUploading: boolean, 
+  setIsUploading: (b: boolean) => void,
+  onSuccess: (m: Material) => void 
+}) {
   const [courseCode, setCourseCode] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -200,28 +196,25 @@ function UploadModal({ onClose, isUploading, setIsUploading }: { onClose: () => 
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file || !auth.currentUser) return;
-    
     setIsUploading(true);
     try {
-      const storageRef = ref(storage, `courseware/${auth.currentUser.uid}/${Date.now()}_${file.name}`);
-      await uploadBytes(storageRef, file);
-      const fileUrl = await getDownloadURL(storageRef);
-
-      await addDoc(collection(db, "materials"), {
+      // Mock Upload Action
+      const nextId = Math.random().toString(36).substr(2, 9);
+      const newMaterial: Material = {
+        id: nextId,
         title: `${courseCode.toUpperCase()}: ${title}`,
         description,
-        fileUrl,
+        fileUrl: "#",
         level,
         semester,
-        lecturerId: auth.currentUser.uid,
+        lecturerId: "demo-lecturer",
         createdAt: new Date().toISOString()
-      });
+      };
 
+      onSuccess(newMaterial);
       onClose();
     } catch (e) {
       console.error("Upload failed", e);
-      alert("Submission failed. Check network integrity.");
     } finally {
       setIsUploading(false);
     }

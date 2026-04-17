@@ -4,8 +4,6 @@
  */
 
 import React, { useState } from "react";
-import { auth } from "../../firebase";
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { motion } from "motion/react";
 import { Mail, Lock, ChevronRight, LogIn, UserPlus, Eye, EyeOff } from "lucide-react";
 
@@ -27,11 +25,29 @@ export default function Login({ onSignUpClick, onSuccess }: LoginProps) {
     setError("");
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      // Mock Login Service
+      const stored = localStorage.getItem("mouau_user");
+      if (stored) {
+        const user = JSON.parse(stored);
+        if (user.email === email) {
+          onSuccess();
+          return;
+        }
+      }
+      
+      // If no stored user matching email, create a dummy one for the demo
+      const demoUser = {
+        uid: "demo-uid",
+        email,
+        name: email.split('@')[0],
+        role: email.includes('lecturer') ? 'lecturer' : 'student',
+        department: "Computer Science",
+        createdAt: new Date().toISOString()
+      };
+      localStorage.setItem("mouau_user", JSON.stringify(demoUser));
       onSuccess();
     } catch (err: any) {
-      setError(err.message || "Invalid university credentials. Please check your email or password.");
-      console.error(err);
+      setError("Login verification failed. Check build logs.");
     } finally {
       setLoading(false);
     }
@@ -39,15 +55,17 @@ export default function Login({ onSignUpClick, onSuccess }: LoginProps) {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
-    try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-      onSuccess();
-    } catch (err: any) {
-      setError("Google Login failed. " + err.message);
-    } finally {
-      setLoading(false);
-    }
+    const demoUser = {
+      uid: "google-uid",
+      email: "google.user@mouau.edu.ng",
+      name: "Google User",
+      role: 'student',
+      department: "Engineering",
+      createdAt: new Date().toISOString()
+    };
+    localStorage.setItem("mouau_user", JSON.stringify(demoUser));
+    onSuccess();
+    setLoading(false);
   };
 
   return (

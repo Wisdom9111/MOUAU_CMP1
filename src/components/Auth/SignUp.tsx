@@ -4,9 +4,6 @@
  */
 
 import React, { useState } from "react";
-import { auth, db } from "../../firebase";
-import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
 import { UserProfile, UserRole, AcademicLevel } from "../../types";
 import { motion } from "motion/react";
 import { GraduationCap, User, Mail, Lock, Building, ChevronRight, LogIn, Eye, EyeOff } from "lucide-react";
@@ -29,16 +26,17 @@ export default function SignUp({ onLoginClick, onSuccess }: SignUpProps) {
 
   const handleGoogleSignUp = async () => {
     setLoading(true);
-    try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-      // For Google signup, we'd typically need a way to capture the role/level/dept
-      // but if the app doesn't have a specific flow for that, we'll just let AuthGuard handle profile missing
-    } catch (err: any) {
-      setError("Google Registration failed. " + err.message);
-    } finally {
-      setLoading(false);
-    }
+    const demoUser: UserProfile = {
+      uid: "google-" + Math.random().toString(36).substr(2, 9),
+      email: "google.user@mouau.edu.ng",
+      name: "Google Student",
+      role: 'student',
+      level: '100L',
+      department: "Computer Science",
+      createdAt: new Date().toISOString()
+    };
+    onSuccess(demoUser);
+    setLoading(false);
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -47,13 +45,8 @@ export default function SignUp({ onLoginClick, onSuccess }: SignUpProps) {
     setError("");
 
     try {
-      // 1. Auth SignUp
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
-      // 2. Create Profile in Firestore
       const newProfile: UserProfile = {
-        uid: user.uid,
+        uid: "local-" + Math.random().toString(36).substr(2, 9),
         email: email,
         name: name,
         role: role,
@@ -62,14 +55,9 @@ export default function SignUp({ onLoginClick, onSuccess }: SignUpProps) {
         createdAt: new Date().toISOString(),
       };
 
-      await setDoc(doc(db, "users", user.uid), newProfile);
       onSuccess(newProfile);
     } catch (err: any) {
-      if (err.code === "auth/email-already-in-use") {
-        setError("This MOUAU account already exists, please login.");
-      } else {
-        setError(err.message || "Failed to create account");
-      }
+      setError("Registration encountered a local error.");
     } finally {
       setLoading(false);
     }
