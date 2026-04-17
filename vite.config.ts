@@ -16,14 +16,34 @@ export default defineConfig(({mode}) => {
       },
     },
     build: {
-      chunkSizeWarningLimit: 5000,
-      target: 'esnext',
-      minify: 'esbuild',
+      chunkSizeWarningLimit: 2000,
+      minify: 'terser',
+      terserOptions: {
+        compress: {
+          drop_console: true,
+          drop_debugger: true,
+        },
+      },
       rollupOptions: {
         output: {
           manualChunks(id) {
             if (id.includes('node_modules')) {
+              if (id.includes('react') || id.includes('router')) {
+                return 'vendor-core';
+              }
+              if (id.includes('lucide') || id.includes('motion')) {
+                return 'vendor-ui';
+              }
+              if (id.includes('recharts') || id.includes('d3')) {
+                return 'vendor-charts';
+              }
               return 'vendor';
+            }
+            if (id.includes('/src/components/ui/')) {
+              return 'ui-components';
+            }
+            if (id.includes('/src/services/')) {
+              return 'services';
             }
           },
         },

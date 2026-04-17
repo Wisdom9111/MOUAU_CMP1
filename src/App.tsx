@@ -4,10 +4,11 @@ import { UserProfile } from "./types";
 import { GraduationCap, LogOut, BookOpen, Upload, LayoutDashboard, Search } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
-import Login from "./components/Auth/Login";
-import SignUp from "./components/Auth/SignUp";
+// Auth related components (Smaller footprint)
+const Login = lazy(() => import("./components/Auth/Login"));
+const SignUp = lazy(() => import("./components/Auth/SignUp"));
 
-// Lazy Loaded Dashboards
+// Dashboard components (Large chunks)
 const AdminDashboard = lazy(() => import("./components/AdminDashboard"));
 const LecturerArea = lazy(() => import("./components/LecturerArea"));
 const StudentArea = lazy(() => import("./components/StudentArea"));
