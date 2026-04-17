@@ -5,8 +5,8 @@
 
 import React, { useState } from "react";
 import { auth, db } from "../../firebase";
-import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
 import { UserProfile, UserRole, AcademicLevel } from "../../types";
 import { motion } from "motion/react";
 import { GraduationCap, User, Mail, Lock, Building, ChevronRight, LogIn, Eye, EyeOff } from "lucide-react";
@@ -29,39 +29,11 @@ export default function SignUp({ onLoginClick, onSuccess }: SignUpProps) {
 
   const handleGoogleSignUp = async () => {
     setLoading(true);
-    const provider = new GoogleAuthProvider();
     try {
-      const { user } = await signInWithPopup(auth, provider);
-      const docRef = doc(db, "users", user.uid);
-      const docSnap = await getDoc(docRef);
-      
-      if (!docSnap.exists()) {
-        const newProfile: UserProfile = {
-          uid: user.uid,
-          email: user.email || "",
-          name: user.displayName || name || "MOUAU User",
-          role: role,
-          level: role === 'student' ? level : 'N/A',
-          department: department || "Computer Science",
-          createdAt: new Date().toISOString(),
-        };
-        await setDoc(docRef, newProfile);
-        
-        // Sync with Sheets
-        try {
-          await fetch("/api/register-sheet", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(newProfile),
-          });
-        } catch (e) {
-          console.error("Sheets sync error:", e);
-        }
-
-        onSuccess(newProfile);
-      } else {
-        onSuccess(docSnap.data() as UserProfile);
-      }
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      // For Google signup, we'd typically need a way to capture the role/level/dept
+      // but if the app doesn't have a specific flow for that, we'll just let AuthGuard handle profile missing
     } catch (err: any) {
       setError("Google Registration failed. " + err.message);
     } finally {
@@ -75,12 +47,14 @@ export default function SignUp({ onLoginClick, onSuccess }: SignUpProps) {
     setError("");
 
     try {
-      const { user } = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(user, { displayName: name });
+      // 1. Auth SignUp
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
 
+      // 2. Create Profile in Firestore
       const newProfile: UserProfile = {
         uid: user.uid,
-        email: user.email || "",
+        email: email,
         name: name,
         role: role,
         level: role === 'student' ? level : 'N/A',
@@ -89,21 +63,13 @@ export default function SignUp({ onLoginClick, onSuccess }: SignUpProps) {
       };
 
       await setDoc(doc(db, "users", user.uid), newProfile);
-
-      // Sync with Google Sheets via Backend
-      try {
-        await fetch("/api/register-sheet", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(newProfile),
-        });
-      } catch (e) {
-        console.error("Sheets sync error:", e);
-      }
-
       onSuccess(newProfile);
     } catch (err: any) {
-      setError(err.message || "Failed to create account");
+      if (err.code === "auth/email-already-in-use") {
+        setError("This MOUAU account already exists, please login.");
+      } else {
+        setError(err.message || "Failed to create account");
+      }
     } finally {
       setLoading(false);
     }

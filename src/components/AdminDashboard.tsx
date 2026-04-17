@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from "react";
 import { db } from "../firebase";
-import { collection, onSnapshot, query, updateDoc, doc, getDocs } from "firebase/firestore";
+import { collection, onSnapshot, updateDoc, doc } from "firebase/firestore";
 import { UserProfile, Material, AcademicLevel, UserRole } from "../types";
 import { Users, FileText, Activity, ShieldCheck, GraduationCap, Trophy, ChevronRight, UserPlus, Search } from "lucide-react";
 import { motion } from "motion/react";
@@ -21,7 +21,7 @@ export default function AdminDashboard() {
       setUsers(snapshot.docs.map(doc => ({ ...doc.data() } as UserProfile)));
     });
     const unsubMaterials = onSnapshot(collection(db, "materials"), (snapshot) => {
-      setMaterials(snapshot.docs.map(doc => ({ ...doc.data() } as Material)));
+      setMaterials(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Material)));
     });
     return () => {
       unsubUsers();

@@ -4,8 +4,8 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { db, auth, storage } from "../firebase";
-import { collection, query, where, onSnapshot, addDoc, doc, updateDoc, setDoc } from "firebase/firestore";
+import { db } from "../firebase";
+import { collection, query, where, onSnapshot, doc, updateDoc, setDoc } from "firebase/firestore";
 import { Material, UserProfile, ReadingHistory, QuizQuestion, AcademicLevel } from "../types";
 import { FileText, Clock, BrainCircuit, Sparkles, X, ChevronRight, Download, BookOpen, User, BookText } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -19,25 +19,24 @@ export default function StudentArea({ profile }: { profile: UserProfile }) {
 
   useEffect(() => {
     const q = query(collection(db, "materials"), where("level", "==", selectedLevel));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsub = onSnapshot(q, (snapshot) => {
       setMaterials(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Material)));
     });
-    return () => unsubscribe();
+    return unsub;
   }, [selectedLevel]);
 
   useEffect(() => {
     const q = query(collection(db, "reading_history"), where("uid", "==", profile.uid));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setHistory(snapshot.docs.map(doc => doc.data() as ReadingHistory));
+    const unsub = onSnapshot(q, (snapshot) => {
+      setHistory(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReadingHistory)));
     });
-    return () => unsubscribe();
+    return unsub;
   }, [profile.uid]);
 
   const recordViewing = async (materialId: string) => {
-    const id = `${profile.uid}_${materialId}`;
-    await setDoc(doc(db, "reading_history", id), {
+    await setDoc(doc(db, "reading_history", `${profile.uid}_${materialId}`), {
       uid: profile.uid,
-      materialId,
+      materialId: materialId,
       viewedAt: new Date().toISOString()
     });
   };

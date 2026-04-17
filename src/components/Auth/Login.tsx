@@ -4,11 +4,10 @@
  */
 
 import React, { useState } from "react";
-import { auth, db } from "../../firebase";
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { auth } from "../../firebase";
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { motion } from "motion/react";
-import { Mail, Lock, ChevronRight, LogIn, UserPlus } from "lucide-react";
+import { Mail, Lock, ChevronRight, LogIn, UserPlus, Eye, EyeOff } from "lucide-react";
 
 interface LoginProps {
   onSignUpClick: () => void;
@@ -18,21 +17,9 @@ interface LoginProps {
 export default function Login({ onSignUpClick, onSuccess }: LoginProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const handleGoogleLogin = async () => {
-    setLoading(true);
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-      onSuccess();
-    } catch (err: any) {
-      setError("Google Login failed. " + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,8 +30,21 @@ export default function Login({ onSignUpClick, onSuccess }: LoginProps) {
       await signInWithEmailAndPassword(auth, email, password);
       onSuccess();
     } catch (err: any) {
-      setError("Invalid university credentials. Please check your email or password.");
+      setError(err.message || "Invalid university credentials. Please check your email or password.");
       console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      onSuccess();
+    } catch (err: any) {
+      setError("Google Login failed. " + err.message);
     } finally {
       setLoading(false);
     }
@@ -92,10 +92,17 @@ export default function Login({ onSignUpClick, onSuccess }: LoginProps) {
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4.5 h-4.5" />
               <input 
-                required type="password" value={password} onChange={e => setPassword(e.target.value)}
-                className="w-full bg-[#F9FAFB] border border-[#D1D5DB] rounded-md py-3 pl-11 pr-4 text-[13px] outline-none focus:ring-1 focus:ring-[#006838]/30"
+                required type={showPassword ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
+                className="w-full bg-[#F9FAFB] border border-[#D1D5DB] rounded-md py-3 pl-11 pr-10 text-[13px] outline-none focus:ring-1 focus:ring-[#006838]/30"
                 placeholder="••••••••"
               />
+              <button 
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#006838] transition-colors"
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </div>
           </div>
 
