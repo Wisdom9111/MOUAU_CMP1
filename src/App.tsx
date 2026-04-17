@@ -176,7 +176,19 @@ function AuthWrapper({ type }: { type: 'login' | 'signup' }) {
   return (
     <AnimatePresence mode="wait">
       {type === 'login' ? (
-        <Login key="login" onSignUpClick={() => navigate('/register')} onSuccess={() => navigate('/')} />
+        <Login 
+          key="login" 
+          onSignUpClick={() => navigate('/register')} 
+          onSuccess={() => {
+            const user = getStoredUser();
+            if (user) {
+              const path = user.role === 'admin' ? '/admin-dashboard' : 
+                          user.role === 'lecturer' ? '/lecturer-dashboard' : 
+                          '/student-dashboard';
+              navigate(path, { replace: true });
+            }
+          }} 
+        />
       ) : (
         <SignUp key="signup" onLoginClick={() => navigate('/login')} onSuccess={(p) => {
           localStorage.setItem("mouau_user", JSON.stringify(p));
