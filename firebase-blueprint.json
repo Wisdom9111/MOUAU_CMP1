@@ -1,0 +1,87 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "System user with specific roles and academic levels.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "lecturer", "student"] },
+        "level": { "type": "string", "enum": ["100L", "200L", "300L", "400L", "500L", "N/A"] },
+        "department": { "type": "string", "description": "University department name" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role", "department", "createdAt"]
+    },
+    "Material": {
+      "title": "Material",
+      "description": "Course material uploaded by lecturers.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "fileUrl": { "type": "string", "format": "uri" },
+        "level": { "type": "string", "enum": ["100L", "200L", "300L", "400L", "500L"] },
+        "semester": { "type": "string", "enum": ["First", "Second"] },
+        "lecturerId": { "type": "string" },
+        "summary": { "type": "string", "description": "AI-generated summary" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "fileUrl", "level", "semester", "lecturerId", "createdAt"]
+    },
+    "Quiz": {
+      "title": "Quiz",
+      "description": "Practice quiz for a specific material.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "materialId": { "type": "string" },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "question": { "type": "string" },
+              "options": { "type": "array", "items": { "type": "string" } },
+              "answerIndex": { "type": "integer" }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["materialId", "questions", "createdAt"]
+    },
+    "ReadingHistory": {
+      "title": "ReadingHistory",
+      "description": "Log of student reading activity.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "materialId": { "type": "string" },
+        "viewedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "materialId", "viewedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/materials/{materialId}": {
+      "schema": "Material",
+      "description": "Course materials"
+    },
+    "/quizzes/{quizId}": {
+      "schema": "Quiz",
+      "description": "Material quizzes"
+    },
+    "/reading_history/{historyId}": {
+      "schema": "ReadingHistory",
+      "description": "Activity logs"
+    }
+  }
+}

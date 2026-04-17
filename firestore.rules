@@ -1,0 +1,103 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /users/{uid}
+    // Fields: name (string), email (string), role (string: admin|lecturer|student), level (string), createdAt (timestamp)
+    //
+    // Collection: /materials/{materialId}
+    // Fields: title (string), description (string), fileUrl (string), level (string), semester (string), lecturerId (string), summary (string), createdAt (timestamp)
+    //
+    // Collection: /quizzes/{quizId}
+    // Fields: materialId (string), questions (list of maps), createdAt (timestamp)
+    //
+    // Collection: /reading_history/{historyId}
+    // Fields: uid (string), materialId (string), viewedAt (timestamp)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        getUserData().role == 'admin' || 
+        (request.auth.token.email == "wisdomezekiel28@gmail.com" && request.auth.token.email_verified == true)
+      );
+    }
+
+    function isLecturer() {
+      return isAuthenticated() && (getUserData().role == 'lecturer' || isAdmin());
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'role', 'department', 'createdAt']) &&
+             data.email is string &&
+             data.department is string &&
+             data.department.size() > 0 &&
+             data.department.size() < 100 &&
+             data.role in ['admin', 'lecturer', 'student'] &&
+             (data.level == null || data.level in ['100L', '200L', '300L', '400L', '500L', 'N/A']);
+    }
+
+    function isValidMaterial(data) {
+      return data.keys().hasAll(['title', 'fileUrl', 'level', 'semester', 'lecturerId', 'createdAt']) &&
+             data.level in ['100L', '200L', '300L', '400L', '500L'] &&
+             data.semester in ['First', 'Second'] &&
+             data.lecturerId == request.auth.uid;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{uid} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isOwner(uid) && isValidUser(request.resource.data);
+      allow update: if isAdmin() || (isOwner(uid) && request.resource.data.role == resource.data.role);
+      allow delete: if isAdmin();
+    }
+
+    match /materials/{materialId} {
+      allow read: if isAuthenticated();
+      allow create: if isLecturer() && isValidMaterial(request.resource.data);
+      allow update: if isAdmin() || (isLecturer() && resource.data.lecturerId == request.auth.uid);
+      allow delete: if isAdmin() || (isLecturer() && resource.data.lecturerId == request.auth.uid);
+    }
+
+    match /quizzes/{quizId} {
+      allow read: if isAuthenticated();
+      allow create: if isLecturer();
+      allow update: if isLecturer();
+      allow delete: if isAdmin();
+    }
+
+    match /reading_history/{historyId} {
+      allow read: if isAuthenticated() && (isAdmin() || request.auth.uid == resource.data.uid);
+      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.uid;
+      allow delete: if isAdmin();
+    }
+    
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}
