@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense, lazy } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { UserProfile } from "./types";
 import { GraduationCap, LogOut, BookOpen, Upload, LayoutDashboard, Search } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
-import AdminDashboard from "./components/AdminDashboard";
-import LecturerArea from "./components/LecturerArea";
-import StudentArea from "./components/StudentArea";
 import Login from "./components/Auth/Login";
 import SignUp from "./components/Auth/SignUp";
+
+// Lazy Loaded Dashboards
+const AdminDashboard = lazy(() => import("./components/AdminDashboard"));
+const LecturerArea = lazy(() => import("./components/LecturerArea"));
+const StudentArea = lazy(() => import("./components/StudentArea"));
 
 // Unified Auth Logic Mock
 const getStoredUser = () => {
@@ -188,26 +190,28 @@ function AuthWrapper({ type }: { type: 'login' | 'signup' }) {
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<AuthWrapper type="login" />} />
-        <Route path="/register" element={<AuthWrapper type="signup" />} />
-        
-        <Route path="/admin-dashboard" element={
-          <AuthGuard allowedRoles={['admin']}><AdminDashboard /></AuthGuard>
-        } />
-        
-        <Route path="/lecturer-dashboard" element={
-          <AuthGuard allowedRoles={['lecturer', 'admin']}><LecturerArea /></AuthGuard>
-        } />
-        
-        <Route path="/student-dashboard" element={
-          <AuthGuard allowedRoles={['student', 'lecturer', 'admin']}>
-            <StudentArea profile={getStoredUser()!} />
-          </AuthGuard>
-        } />
+      <Suspense fallback={<LoadingScreen />}>
+        <Routes>
+          <Route path="/login" element={<AuthWrapper type="login" />} />
+          <Route path="/register" element={<AuthWrapper type="signup" />} />
+          
+          <Route path="/admin-dashboard" element={
+            <AuthGuard allowedRoles={['admin']}><AdminDashboard /></AuthGuard>
+          } />
+          
+          <Route path="/lecturer-dashboard" element={
+            <AuthGuard allowedRoles={['lecturer', 'admin']}><LecturerArea /></AuthGuard>
+          } />
+          
+          <Route path="/student-dashboard" element={
+            <AuthGuard allowedRoles={['student', 'lecturer', 'admin']}>
+              <StudentArea profile={getStoredUser()!} />
+            </AuthGuard>
+          } />
 
-        <Route path="/" element={<Navigate to="/login" replace />} />
-      </Routes>
+          <Route path="/" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }
