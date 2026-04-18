@@ -47,7 +47,7 @@ function AuthGuard({ children, allowedRoles }) {
       setProfile(user);
       if (allowedRoles && !allowedRoles.includes(user.role)) {
         const fallback = user.role === 'admin' ? '/admin-dashboard' : 
-                         user.role === 'lecturer' ? '/lecturer-dashboard' : 
+                         user.role === 'lecturer' ? '/lecturer-dashboard' :
                          '/student-dashboard';
         navigate(fallback, { replace: true });
       }
@@ -75,9 +75,11 @@ function Layout({ children, profile }) {
 
   const isLecturer = profile?.role === 'lecturer';
   const isAdmin = profile?.role === 'admin';
+  const isStudent = profile?.role === 'student';
 
   return (
-    <div className="min-h-screen bg-[#F3F4F6] flex">
+    <div className={`min-h-screen ${isStudent && location.pathname.includes('student') ? 'bg-white' : 'bg-[#F3F4F6]'} flex`}>
+      {(!isStudent || !location.pathname.includes('student')) && (
       <nav className={`w-[260px] ${isLecturer ? 'bg-[#002b18]' : 'bg-[#111827]'} text-white flex flex-col h-screen fixed top-0 left-0 z-20 transition-all`}>
         <div className="p-8">
            <div className="flex items-center gap-4 mb-10 pb-6 border-b border-white/5">
@@ -97,7 +99,23 @@ function Layout({ children, profile }) {
            <button onClick={logout} className="w-full bg-red-500/10 text-red-500 py-3 rounded-lg text-[9px] font-black uppercase tracking-[0.2em] border border-red-500/20 hover:bg-red-500 hover:text-white transition-all">Logout Session</button>
         </div>
       </nav>
-      <main className="flex-1 ml-[260px] p-10 overflow-y-auto h-screen">{children}</main>
+      )}
+
+      {/* Student Top Bar (Hidden for lecturers/admins) */}
+      {isStudent && location.pathname.includes('student') && (
+         <div className="fixed top-0 left-0 right-0 h-[80px] bg-[#111827] z-20 flex items-center justify-between px-10 text-white">
+            <div className="flex items-center gap-4">
+               <div className="w-10 h-10 bg-[#006838] rounded-xl flex items-center justify-center font-black shadow-lg">M</div>
+               <div>
+                  <h1 className="font-black text-sm uppercase tracking-wider leading-none">MOUAU Curriculum</h1>
+                  <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest">Student Portal: {profile.name} ({profile.level})</p>
+               </div>
+            </div>
+            <button onClick={logout} className="text-[11px] font-bold text-red-400 uppercase tracking-widest hover:text-red-300">End Session</button>
+         </div>
+      )}
+
+      <main className={`flex-1 ${isStudent && location.pathname.includes('student') ? 'mt-[80px] p-6' : 'ml-[260px] p-10'} overflow-y-auto h-screen`}>{children}</main>
     </div>
   );
 }
@@ -108,7 +126,7 @@ function AuthWrapper({ type }) {
     const user = getStoredUser();
     if (user) {
       const path = user.role === 'admin' ? '/admin-dashboard' : 
-                   user.role === 'lecturer' ? '/lecturer-dashboard' : 
+                   user.role === 'lecturer' ? '/lecturer-dashboard' :
                    '/student-dashboard';
       navigate(path, { replace: true });
     }
@@ -117,9 +135,19 @@ function AuthWrapper({ type }) {
   return (
     <Suspense fallback={<LoadingScreen />}>
       {type === 'login' ? (
-        <Login onSignUpClick={() => navigate('/register')} onSuccess={() => navigate('/')} />
+        <Login onSignUpClick={() => navigate('/register')} onSuccess={() => {
+          const u = getStoredUser();
+          if (u) {
+            navigate(u.role === 'admin' ? '/admin-dashboard' : u.role === 'lecturer' ? '/lecturer-dashboard' : '/student-dashboard', { replace: true });
+          } else {
+            navigate('/');
+          }
+        }} />
       ) : (
-        <SignUp onLoginClick={() => navigate('/login')} onSuccess={() => navigate('/')} />
+        <SignUp onLoginClick={() => navigate('/login')} onSuccess={(user) => {
+          localStorage.setItem("mouau_user", JSON.stringify(user));
+          navigate(user.role === 'admin' ? '/admin-dashboard' : user.role === 'lecturer' ? '/lecturer-dashboard' : '/student-dashboard', { replace: true });
+        }} />
       )}
     </Suspense>
   );

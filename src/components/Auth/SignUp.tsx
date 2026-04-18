@@ -19,8 +19,8 @@ export default function SignUp({ onLoginClick, onSuccess }: SignUpProps) {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [department, setDepartment] = useState("");
-  const [role, setRole] = useState<UserRole>("student");
-  const [level, setLevel] = useState<AcademicLevel>("100L");
+  const [role, setRole] = useState<UserRole>("lecturer");
+  const [level, setLevel] = useState<AcademicLevel>("N/A");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -29,9 +29,9 @@ export default function SignUp({ onLoginClick, onSuccess }: SignUpProps) {
     const demoUser: UserProfile = {
       uid: "google-" + Math.random().toString(36).substr(2, 9),
       email: "google.user@mouau.edu.ng",
-      name: "Google Student",
-      role: 'student',
-      level: '100L',
+      name: "Google Faculty",
+      role: 'lecturer',
+      level: 'N/A',
       department: "Computer Science",
       createdAt: new Date().toISOString()
     };
@@ -50,7 +50,7 @@ export default function SignUp({ onLoginClick, onSuccess }: SignUpProps) {
         email: email,
         name: name,
         role: role,
-        level: role === 'student' ? level : 'N/A',
+        level: 'N/A',
         department: department,
         createdAt: new Date().toISOString(),
       };
@@ -140,7 +140,7 @@ export default function SignUp({ onLoginClick, onSuccess }: SignUpProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-[#6B7280] uppercase tracking-widest">Portal Role</label>
               <select 
@@ -148,7 +148,8 @@ export default function SignUp({ onLoginClick, onSuccess }: SignUpProps) {
                 className="w-full bg-[#F9FAFB] border border-[#D1D5DB] rounded-md py-2.5 px-3 text-sm outline-none"
               >
                 <option value="student">Student</option>
-                <option value="lecturer">Lecturer</option>
+                <option value="lecturer">Lecturer / Faculty</option>
+                <option value="admin">Administrator</option>
               </select>
             </div>
             {role === 'student' && (

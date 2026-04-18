@@ -11,7 +11,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 const MOCK_USERS: UserProfile[] = [
   { uid: "1", name: "Dr. Adebayo", email: "adebayo@mouau.edu.ng", role: "lecturer", level: "N/A", department: "Computer Science", createdAt: new Date().toISOString() },
-  { uid: "2", name: "Chinedu Okafor", email: "chinedu@mouau.edu.ng", role: "student", level: "300L", department: "Computer Science", createdAt: new Date().toISOString() }
+  { uid: "2", name: "System Admin", email: "admin@mouau.edu.ng", role: "admin", level: "N/A", department: "ICT", createdAt: new Date().toISOString() }
 ];
 
 export default function AdminDashboard() {
@@ -25,7 +25,7 @@ export default function AdminDashboard() {
   }, []);
 
   const changeRole = async (uid: string, newRole: UserRole) => {
-    setUsers(prev => prev.map(u => u.uid === uid ? { ...u, role: newRole, level: newRole === 'student' ? '100L' : 'N/A' } as UserProfile : u));
+    setUsers(prev => prev.map(u => u.uid === uid ? { ...u, role: newRole, level: 'N/A' } as UserProfile : u));
   };
 
   const changeLevel = async (uid: string, newLevel: AcademicLevel) => {
@@ -47,9 +47,9 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-6">
       <div className="stats-grid">
-        <StatCard label="Total Students" value={users.filter(u => u.role === 'student').length.toLocaleString()} meta="+12% from last semester" />
+        <StatCard label="Total Faculty" value={users.filter(u => u.role === 'lecturer').length.toLocaleString()} meta="+2% from last semester" />
         <StatCard label="Course Materials" value={materials.length.toLocaleString()} meta="98 uploads this month" />
-        <StatCard label="AI Quizzes Ready" value={materials.filter(m => m.summary).length.toLocaleString()} meta="Gemini API Status: Optimal" />
+        <StatCard label="AI Quizzes Ready" value={materials.filter(m => m.summary !== undefined).length.toLocaleString()} meta="Gemini API Status: Optimal" />
         <StatCard label="Sheet Sync" value="Active" meta="Last sync: 2 mins ago" />
       </div>
 

@@ -1,334 +1,143 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useState, useEffect } from "react";
-import { Material, UserProfile, ReadingHistory, QuizQuestion, AcademicLevel } from "../types";
-import { FileText, Clock, BrainCircuit, Sparkles, X, ChevronRight, Download, BookOpen, User, BookText } from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
-import { generateSummary, generateQuiz } from "../services/geminiService";
+import { Material, UserProfile } from "../types";
+import { FileText, Maximize2, Minimize2, Search, BookOpen, Clock } from "lucide-react";
+import { motion } from "motion/react";
 
-const MOCK_STUDENT_MATERIALS: Material[] = [
-  {
-    id: "1",
-    title: "CSC 101: Introduction to Computing",
-    description: "Foundational concepts of hardware and software.",
-    fileUrl: "#",
-    level: "100L",
-    semester: "First",
-    lecturerId: "lecturer-1",
-    summary: "This document covers binary systems, CPU architecture, and basic programming concepts.",
-    createdAt: new Date().toISOString()
-  }
+// Standard reliable PDF for demonstration of online reading
+const DEMO_PDF = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
+
+const MOCK_MATERIALS: Material[] = [
+  { id: "1", title: "CSC 101: Introduction", description: "Foundations of Computer Science.", fileUrl: DEMO_PDF, level: "100L", semester: "First", lecturerId: "l1", createdAt: new Date().toISOString() },
+  { id: "2", title: "MTH 101: Elementary Math", description: "Algebra and Trigonometry concepts.", fileUrl: DEMO_PDF, level: "100L", semester: "First", lecturerId: "l2", createdAt: new Date().toISOString() },
+  { id: "3", title: "CSC 201: Data Structures", description: "Arrays, Linked Lists, Trees, and Graphs.", fileUrl: DEMO_PDF, level: "200L", semester: "First", lecturerId: "l1", createdAt: new Date().toISOString() },
+  { id: "4", title: "CSC 301: Algorithms", description: "Sorting, Searching, and Complexity.", fileUrl: DEMO_PDF, level: "300L", semester: "First", lecturerId: "l1", createdAt: new Date().toISOString() },
+  { id: "5", title: "CSC 401: AI Fundamentals", description: "Heuristics and Neural Networks.", fileUrl: DEMO_PDF, level: "400L", semester: "First", lecturerId: "l1", createdAt: new Date().toISOString() },
 ];
 
 export default function StudentArea({ profile }: { profile: UserProfile | null }) {
-  const [materials, setMaterials] = useState<Material[]>(MOCK_STUDENT_MATERIALS);
-  const [history, setHistory] = useState<ReadingHistory[]>([]);
-  const [selectedLevel, setSelectedLevel] = useState<AcademicLevel>(profile?.level as AcademicLevel || '100L');
-  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [selectedDoc, setSelectedDoc] = useState<Material | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    // Mock Filtering
-    const filtered = MOCK_STUDENT_MATERIALS.filter(m => m.level === selectedLevel);
-    setMaterials(filtered);
-  }, [selectedLevel]);
-
-  const recordViewing = async (materialId: string) => {
-    if (!profile) return;
-    if (!history.some(h => h.materialId === materialId)) {
-      setHistory(prev => [...prev, { id: Math.random().toString(), uid: profile.uid, materialId, viewedAt: new Date().toISOString() }]);
+    if (profile?.level) {
+      setMaterials(MOCK_MATERIALS.filter(m => m.level === profile.level));
     }
-  };
+  }, [profile]);
+
+  if (!profile) return null;
+
+  const filtered = materials.filter(m => m.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center bg-white p-5 border border-[#D1D5DB] rounded-lg shadow-sm">
-        <div>
-          <h2 className="text-lg font-bold text-[#111827]">Academic Catalog</h2>
-          <p className="text-[10px] text-[#6B7280] font-bold uppercase tracking-widest mt-0.5">Filter by Level</p>
+    <div className={`flex flex-col h-[calc(100vh-80px)] transition-all ${isFullscreen ? 'fixed inset-0 z-50 bg-white p-0 h-screen' : ''}`}>
+      {isFullscreen && (
+        <div className="flex items-center justify-between p-4 bg-[#111827] text-white">
+          <h2 className="font-bold text-sm tracking-tight">{selectedDoc?.title}</h2>
+          <button 
+            onClick={() => setIsFullscreen(false)}
+            className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-colors text-xs font-bold uppercase tracking-widest flex items-center gap-2"
+          >
+            <Minimize2 size={16} /> Exit Reader Mode
+          </button>
         </div>
-        <div className="flex gap-2">
-          {(["100L", "200L", "300L", "400L", "500L"] as AcademicLevel[]).map((lvl) => (
-            <button
-              key={lvl}
-              onClick={() => setSelectedLevel(lvl)}
-              className={`high-density-badge cursor-pointer transition-all border-none outline-none ${selectedLevel === lvl ? 'bg-[#006838] text-white' : 'bg-[#E5E7EB] text-[#4B5563] hover:bg-[#D1D5DB]'}`}
-            >
-              {lvl}
-            </button>
-          ))}
-        </div>
-      </div>
+      )}
 
-      <div className="lg:grid lg:grid-cols-[1.8fr_1fr] gap-6 space-y-6 lg:space-y-0">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-min">
-          {materials.length === 0 ? (
-            <div className="col-span-full py-12 text-center bg-white rounded-lg border border-[#D1D5DB] border-dashed">
-               <FileText className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-               <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-wider">No materials found for {selectedLevel}</p>
-            </div>
-          ) : (
-            materials.map((m) => (
-              <div key={m.id}>
-                <MaterialCard 
-                  material={m} 
-                  isViewed={history.some(h => h.materialId === m.id)}
-                  onClick={() => {
-                    setSelectedMaterial(m);
-                    recordViewing(m.id);
-                  }} 
+      <div className={`grid grid-cols-1 md:grid-cols-12 gap-6 flex-1 min-h-0 ${isFullscreen ? 'p-0' : ''}`}>
+        {/* Left Sidebar: Document List */}
+        {!isFullscreen && (
+          <div className="md:col-span-4 lg:col-span-4 xl:col-span-3 flex flex-col bg-white border border-[#D1D5DB] rounded-xl shadow-sm overflow-hidden h-full">
+            <div className="p-5 border-b border-[#D1D5DB] bg-gray-50/50">
+              <h2 className="text-[15px] font-black text-[#111827] mb-1 leading-tight">Your {profile.level} Library</h2>
+              <p className="text-[10px] text-[#006838] font-black uppercase tracking-[0.2em] mb-5">Curriculum Materials</p>
+              
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input 
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search material topics..."
+                  className="w-full pl-9 pr-4 py-2.5 bg-white border border-[#D1D5DB] rounded-lg text-[13px] outline-none focus:ring-2 focus:ring-[#006838]/20 transition-shadow font-medium"
                 />
               </div>
-            ))
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-3 space-y-1.5 custom-scrollbar bg-gray-50/20">
+              {filtered.length === 0 ? (
+                 <div className="p-8 text-center text-gray-400 mt-10">
+                    <BookOpen size={32} className="mx-auto mb-3 opacity-30 text-[#006838]" />
+                    <p className="text-[13px] font-bold">No materials published yet.</p>
+                    <p className="text-[11px] mt-1 text-gray-400">Lecturers have not sent documents for this level.</p>
+                 </div>
+              ) : filtered.map(m => (
+                <button
+                  key={m.id}
+                  onClick={() => setSelectedDoc(m)}
+                  className={`w-full text-left p-4 rounded-xl transition-all border outline-none ${selectedDoc?.id === m.id ? 'bg-[#F0FDF4] border-[#006838]/30 shadow-sm ring-1 ring-[#006838]/10' : 'border-transparent hover:bg-white hover:border-[#D1D5DB] hover:shadow-sm'}`}
+                >
+                  <div className="flex items-start gap-3.5">
+                    <div className={`p-2.5 rounded-lg shrink-0 ${selectedDoc?.id === m.id ? 'bg-[#006838] text-white shadow-sm' : 'bg-gray-100 text-[#6B7280]'}`}>
+                       <FileText size={18} />
+                    </div>
+                    <div>
+                      <h3 className={`text-[13px] font-bold line-clamp-1 leading-tight mb-1 ${selectedDoc?.id === m.id ? 'text-[#006838]' : 'text-gray-900'}`}>{m.title}</h3>
+                      <p className="text-[11px] text-gray-500 line-clamp-2 leading-relaxed">{m.description}</p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Right Side: Online Reader Engine */}
+        <div className={`flex flex-col bg-white border-[#D1D5DB] ${isFullscreen ? 'border-0 rounded-none' : 'border rounded-xl md:col-span-8 lg:col-span-8 xl:col-span-9'} shadow-sm overflow-hidden h-[600px] md:h-full`}>
+          {selectedDoc ? (
+            <>
+              {!isFullscreen && (
+                <div className="px-6 py-5 border-b border-[#D1D5DB] flex justify-between items-center bg-gray-50/50">
+                  <div>
+                    <h2 className="text-base font-black text-[#111827]">{selectedDoc.title}</h2>
+                    <div className="flex gap-4 mt-1.5 flex-wrap">
+                      <span className="text-[11px] font-bold text-[#6B7280] flex items-center gap-1.5 uppercase tracking-wider bg-gray-100 px-2.5 py-1 rounded-md"><Clock size={12} /> Uploaded: {new Date(selectedDoc.createdAt).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setIsFullscreen(true)}
+                    className="flex shrink-0 items-center gap-2 px-6 py-2.5 bg-[#006838] text-white rounded-lg text-[11px] font-black uppercase tracking-widest hover:bg-[#00522c] transition-colors shadow-md hover:shadow-lg focus:ring-4 focus:ring-[#006838]/20"
+                  >
+                    <Maximize2 size={16} /> Maximize Reader
+                  </button>
+                </div>
+              )}
+              
+              {/* PDF Secure iFrame Reader */}
+              <div className="flex-1 bg-[#F3F4F6] relative group">
+                 <div className="absolute inset-0 flex items-center justify-center p-10 text-center pointer-events-none">
+                    <div>
+                        <div className="w-12 h-12 rounded-full border-4 border-[#006838] border-t-transparent animate-spin mx-auto mb-4 opacity-20"></div>
+                        <p className="text-[#6B7280] font-bold text-[11px] uppercase tracking-widest">Rendering Document Engine...</p>
+                    </div>
+                 </div>
+                 <iframe 
+                   src={`${selectedDoc.fileUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`} 
+                   className="absolute inset-0 w-full h-full border-0 shadow-inner z-10"
+                   title={selectedDoc.title}
+                 />
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center flex-1 text-center p-10 bg-gradient-to-br from-white to-gray-50">
+              <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6 shadow-inner">
+                <BookOpen size={40} className="text-gray-300" />
+              </div>
+              <h3 className="text-xl font-black text-gray-900 mb-3">Online Document Engine</h3>
+              <p className="text-[13px] text-gray-500 max-w-sm leading-relaxed font-medium">Select a document from your curriculum library on the left to read it instantly in your browser.<br/><br/> <strong className="text-[#006838] font-bold">No downloads required.</strong></p>
+            </div>
           )}
         </div>
-
-        <div className="space-y-4">
-           <div className="bg-white border border-[#D1D5DB] rounded-lg shadow-sm flex flex-col overflow-hidden">
-             <div className="px-5 py-4 border-b border-[#D1D5DB] flex justify-between items-center bg-gray-50/30">
-               <h3 className="text-sm font-semibold text-[#111827]">Gemini AI Lab</h3>
-               <div className="text-[10px] text-[#006838] font-bold uppercase tracking-widest">Live Feed</div>
-             </div>
-             <div className="p-5" style={{ background: 'linear-gradient(135deg, #FFFFFF 0%, #F0FDF4 100%)' }}>
-               {selectedMaterial ? (
-                 <>
-                   <div className="font-mono text-[11px] text-[#006838] bg-[#F0FDF4] px-2 py-1 rounded inline-block mb-3 border border-[#006838]/20">
-                     {selectedMaterial.title.split(':')[0] || 'DOCX_ACTIVE'}
-                   </div>
-                   <div className="ai-summary-box shadow-sm">
-                      <p className="font-bold text-[#006838] mb-1">Summary Snapshot:</p>
-                      {selectedMaterial.summary || "Select a document from your catalog to generate an AI summary."}
-                   </div>
-                   {selectedMaterial.summary && (
-                     <div className="mt-4 pt-4 border-t border-[#D1D5DB]">
-                        <p className="text-[11px] font-bold text-[#6B7280] uppercase tracking-widest mb-3">Assessment Preview</p>
-                        <div className="bg-white p-3 rounded border border-gray-100 text-[12px] italic text-[#4B5563] mb-4">
-                           "AI is analyzing document structure to prepare the full practice quiz..."
-                        </div>
-                        <button 
-                          onClick={() => setSelectedMaterial(selectedMaterial)}
-                          className="w-full bg-[#006838] text-white py-2 rounded text-[11px] font-bold uppercase tracking-widest hover:opacity-90 shadow-sm"
-                        >
-                          Launch Full Quiz
-                        </button>
-                     </div>
-                   )}
-                 </>
-               ) : (
-                 <div className="py-12 text-center">
-                    <BrainCircuit className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-                    <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-wider">Select material to activate AI</p>
-                 </div>
-               )}
-             </div>
-           </div>
-        </div>
       </div>
-
-      <AnimatePresence>
-        {selectedMaterial && (
-          <MaterialDetailModal 
-            material={selectedMaterial} 
-            onClose={() => setSelectedMaterial(null)} 
-            setMaterials={setMaterials}
-          />
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-function MaterialCard({ material, isViewed, onClick }: { material: Material, isViewed: boolean, onClick: () => void }) {
-  return (
-    <div 
-      onClick={onClick}
-      className="bg-white p-4 rounded-lg border border-[#D1D5DB] shadow-sm cursor-pointer hover:border-[#006838] transition-all flex flex-col h-full group"
-    >
-      <div className="flex justify-between items-start mb-3">
-        <div className={`p-2 rounded ${isViewed ? 'bg-[#E6F4EA] text-[#006838]' : 'bg-gray-100 text-gray-400 group-hover:bg-[#E6F4EA] group-hover:text-[#006838]'}`}>
-          <BookText size={16} />
-        </div>
-        {isViewed && <span className="high-density-badge badge-ready uppercase">Completed</span>}
-      </div>
-      
-      <div className="flex-1">
-        <h3 className="text-[13px] font-bold text-[#111827] line-clamp-1 mb-1">{material.title}</h3>
-        <p className="text-[11px] text-[#6B7280] line-clamp-2 leading-relaxed">{material.description}</p>
-      </div>
-
-      <div className="mt-4 flex items-center justify-between text-[10px] font-bold text-gray-300 group-hover:text-[#6B7280] transition-colors">
-         <div className="flex items-center gap-1">
-            <User size={10} />
-            <span>DEPT_LECTURER</span>
-         </div>
-         <div className="flex gap-1.5 font-sans">
-            {material.summary && <span className="text-[#006838] uppercase">Summary</span>}
-            <ChevronRight size={10} />
-         </div>
-      </div>
-    </div>
-  );
-}
-
-function MaterialDetailModal({ material, onClose, setMaterials }: { material: Material, onClose: () => void, setMaterials: React.Dispatch<React.SetStateAction<Material[]>> }) {
-  const [summary, setSummary] = useState(material.summary || "");
-  const [loadingSummary, setLoadingSummary] = useState(false);
-  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
-  const [loadingQuiz, setLoadingQuiz] = useState(false);
-  const [showQuiz, setShowQuiz] = useState(false);
-  const [completedQuiz, setCompletedQuiz] = useState(false);
-  const [score, setScore] = useState(0);
-
-  const handleGenerateSummary = async () => {
-    setLoadingSummary(true);
-    try {
-      const s = await generateSummary(`${material.title}: ${material.description}`);
-      setSummary(s);
-      // Mock Update
-      setMaterials(prev => prev.map(m => m.id === material.id ? { ...m, summary: s } : m));
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingSummary(false);
-    }
-  };
-
-  const handleGenerateQuiz = async () => {
-    if (quizQuestions.length > 0) {
-      setShowQuiz(true);
-      return;
-    }
-    setLoadingQuiz(true);
-    try {
-      const q = await generateQuiz(`${material.title}: ${material.description}`);
-      setQuizQuestions(q);
-      setShowQuiz(true);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingQuiz(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-[#111827]/60 backdrop-blur-xs" onClick={onClose} />
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="relative bg-white w-full max-w-2xl max-h-[90vh] rounded-lg shadow-2xl flex flex-col overflow-hidden border border-[#D1D5DB]"
-      >
-        <div className="px-6 py-4 border-b border-[#D1D5DB] flex justify-between items-center bg-gray-50/50">
-          <div className="flex items-center gap-3">
-             <div className="w-8 h-8 rounded bg-[#006838] flex items-center justify-center text-white">
-                <BookOpen size={16} />
-             </div>
-             <h2 className="text-sm font-bold text-[#111827]">{material.title}</h2>
-          </div>
-          <button onClick={onClose} className="text-[#6B7280] hover:text-[#111827]"><X size={18} /></button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-8">
-           <section>
-             <div className="flex items-center justify-between mb-4">
-               <div>
-                  <h3 className="text-[11px] font-bold text-[#6B7280] uppercase tracking-widest">Document Overview</h3>
-                  <p className="text-sm text-[#374151] mt-1">{material.description}</p>
-               </div>
-               <a 
-                 href={material.fileUrl} target="_blank" rel="noreferrer"
-                 className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded text-[11px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors"
-               >
-                 <Download size={14} /> Download
-               </a>
-             </div>
-           </section>
-
-           <section className="bg-gray-50/50 p-6 rounded-lg border border-[#D1D5DB]">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-2">
-                   <Sparkles size={16} className="text-[#006838]" />
-                   <h3 className="text-sm font-bold text-[#111827]">Gemini AI Insights</h3>
-                </div>
-                {!summary && (
-                  <button 
-                    onClick={handleGenerateSummary} disabled={loadingSummary}
-                    className="bg-[#006838] text-white px-4 py-1.5 rounded text-[10px] font-bold uppercase tracking-widest disabled:opacity-50"
-                  >
-                    {loadingSummary ? 'Parsing...' : 'Generate Summary'}
-                  </button>
-                )}
-              </div>
-
-              {summary ? (
-                <div className="ai-summary-box shadow-sm">
-                  <p className="font-bold text-[#006838] mb-2">Key Learning Points:</p>
-                  <div className="space-y-2">
-                    {summary.split('\n').map((line, i) => <p key={i}>{line}</p>)}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-[12px] text-gray-400 italic text-center py-4">AI Insight requires trigger to analyze content.</p>
-              )}
-
-              <div className="mt-8">
-                <div className="flex items-center justify-between mb-4">
-                   <h3 className="text-[11px] font-bold text-[#6B7280] uppercase tracking-widest">Practice Assessment</h3>
-                   <button 
-                      onClick={handleGenerateQuiz} disabled={loadingQuiz}
-                      className="text-[#006838] font-bold text-[11px] uppercase tracking-wider hover:underline flex items-center gap-1"
-                    >
-                      {loadingQuiz ? 'Assembling Quiz...' : (quizQuestions.length > 0 ? 'Review Quiz' : 'Assemble Quiz')}
-                      <ChevronRight size={12} />
-                    </button>
-                </div>
-
-                {showQuiz && (
-                  <div className="space-y-6 pt-4 border-t border-gray-100">
-                    {quizQuestions.map((q, idx) => (
-                      <div key={idx} className="space-y-3">
-                         <p className="text-[13px] font-semibold text-[#111827] flex gap-2">
-                            <span className="text-[#006838]">Q{idx+1}.</span>
-                            {q.question}
-                         </p>
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            {q.options.map((opt, oIdx) => (
-                              <button 
-                                key={oIdx}
-                                onClick={() => {
-                                  if (completedQuiz) return;
-                                  if (oIdx === q.answerIndex) setScore(s => s + 1);
-                                  if (idx === quizQuestions.length - 1) setCompletedQuiz(true);
-                                }}
-                                className={`text-left p-2.5 rounded border text-[12px] transition-all ${completedQuiz ? (oIdx === q.answerIndex ? 'bg-[#DCFCE7] border-[#DCFCE7] text-[#166534]' : 'bg-gray-50 border-gray-100 text-[#6B7280]') : 'border-gray-100 hover:border-[#006838] hover:bg-[#F0FDF4]'}`}
-                              >
-                                {opt}
-                              </button>
-                            ))}
-                         </div>
-                      </div>
-                    ))}
-                    
-                    {completedQuiz && (
-                      <div className="bg-[#006838] text-white p-4 rounded-lg text-center">
-                         <p className="text-[11px] font-bold uppercase tracking-[0.2em] mb-1">Assessment Complete</p>
-                         <p className="text-xl font-bold">Your Score: {score} / {quizQuestions.length}</p>
-                         <button 
-                           onClick={() => { setCompletedQuiz(false); setScore(0); setShowQuiz(false); }}
-                           className="mt-3 text-[10px] font-bold uppercase bg-white/20 px-4 py-1.5 rounded hover:bg-white/30 transition-all shadow-sm"
-                         >
-                           Reset Assessment
-                         </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-           </section>
-        </div>
-      </motion.div>
     </div>
   );
 }

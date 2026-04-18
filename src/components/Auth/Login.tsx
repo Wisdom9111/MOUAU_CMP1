@@ -40,7 +40,8 @@ export default function Login({ onSignUpClick, onSuccess }: LoginProps) {
         uid: "demo-uid",
         email,
         name: email.split('@')[0],
-        role: email.includes('lecturer') ? 'lecturer' : 'student',
+        role: email.includes('admin') ? 'admin' : (email.includes('student') ? 'student' : 'lecturer'),
+        level: email.includes('student') ? '100L' : 'N/A',
         department: "Computer Science",
         createdAt: new Date().toISOString()
       };
@@ -59,7 +60,7 @@ export default function Login({ onSignUpClick, onSuccess }: LoginProps) {
       uid: "google-uid",
       email: "google.user@mouau.edu.ng",
       name: "Google User",
-      role: 'student',
+      role: 'lecturer',
       department: "Engineering",
       createdAt: new Date().toISOString()
     };
