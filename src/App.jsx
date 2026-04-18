@@ -54,8 +54,6 @@ function AuthGuard({ children, allowedRoles }) {
     }
   }, [navigate, location.pathname, allowedRoles]);
 
-  if (!profile) return <LoadingScreen />;
-
   return <Layout profile={profile}>{children}</Layout>;
 }
 
