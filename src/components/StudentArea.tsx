@@ -3,11 +3,33 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Component, ReactNode } from "react";
 import { Material, UserProfile, ReadingHistory, QuizQuestion, AcademicLevel } from "../types";
-import { FileText, Clock, BrainCircuit, Sparkles, X, ChevronRight, Download, BookOpen, User, BookText } from "lucide-react";
+import { FileText, Clock, BrainCircuit, Sparkles, X, ChevronRight, Download, BookOpen, User, BookText, AlertTriangle, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { generateSummary, generateQuiz } from "../services/geminiService";
+
+// Error Boundary for Student Area to prevent full page white screens
+class StudentErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean, error: Error | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 text-center bg-white rounded-xl border border-red-200">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-lg font-bold text-gray-900">Student Dashboard Error</h2>
+          <p className="text-xs text-gray-500 mt-2">{this.state.error?.message}</p>
+          <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-red-50 text-red-600 rounded text-xs font-bold uppercase">Reload Dashboard</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const MOCK_STUDENT_MATERIALS: Material[] = [
   {
@@ -23,29 +45,68 @@ const MOCK_STUDENT_MATERIALS: Material[] = [
   }
 ];
 
-export default function StudentArea({ profile }: { profile: UserProfile }) {
+export default function StudentAreaWrapper({ profile }: { profile: UserProfile }) {
+  return (
+    <StudentErrorBoundary>
+      <StudentArea profile={profile} />
+    </StudentErrorBoundary>
+  );
+}
+
+function StudentArea({ profile }: { profile: UserProfile }) {
   const [materials, setMaterials] = useState<Material[]>(MOCK_STUDENT_MATERIALS);
   const [history, setHistory] = useState<ReadingHistory[]>([]);
-  const [selectedLevel, setSelectedLevel] = useState<AcademicLevel>(profile.level as AcademicLevel);
+  const [selectedLevel, setSelectedLevel] = useState<AcademicLevel>((profile?.level || "100L") as AcademicLevel);
   const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    // Mock Filtering
-    const filtered = MOCK_STUDENT_MATERIALS.filter(m => m.level === selectedLevel);
-    setMaterials(filtered);
-  }, [selectedLevel]);
+    // Safety check for dependency
+    if (!selectedLevel) return;
+    
+    // Simulate loading to ensure safety shield is visible
+    setIsLoaded(false);
+    const filterData = () => {
+      try {
+        const filtered = MOCK_STUDENT_MATERIALS?.filter(m => m?.level === selectedLevel) || [];
+        setMaterials(filtered);
+      } catch (err) {
+        console.error("Filter error:", err);
+        setMaterials([]);
+      } finally {
+        setIsLoaded(true);
+      }
+    };
+    
+    const timeout = setTimeout(filterData, 300);
+    return () => clearTimeout(timeout);
+  }, [selectedLevel]); // Clean dependency array without causing infinite loops
 
   const recordViewing = async (materialId: string) => {
-    if (!history.some(h => h.materialId === materialId)) {
-      setHistory(prev => [...prev, { id: Math.random().toString(), uid: profile.uid, materialId, viewedAt: new Date().toISOString() }]);
+    if (!history?.some(h => h?.materialId === materialId)) {
+      setHistory(prev => [...(prev || []), { 
+        id: Math.random().toString(), 
+        uid: profile?.uid || 'anonymous', 
+        materialId, 
+        viewedAt: new Date().toISOString() 
+      }]);
     }
   };
+
+  if (!isLoaded) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 text-[#006838] animate-spin mb-4" />
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Loading Catalog Data...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center bg-white p-5 border border-[#D1D5DB] rounded-lg shadow-sm">
         <div>
-          <h2 className="text-lg font-bold text-[#111827]">Academic Catalog</h2>
+          <h2 className="text-lg font-bold text-[#111827]">Academic Catalog ({profile?.level || 'N/A'})</h2>
           <p className="text-[10px] text-[#6B7280] font-bold uppercase tracking-widest mt-0.5">Filter by Level</p>
         </div>
         <div className="flex gap-2">
@@ -63,20 +124,22 @@ export default function StudentArea({ profile }: { profile: UserProfile }) {
 
       <div className="lg:grid lg:grid-cols-[1.8fr_1fr] gap-6 space-y-6 lg:space-y-0">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-min">
-          {materials.length === 0 ? (
+          {(!materials || materials.length === 0) ? (
             <div className="col-span-full py-12 text-center bg-white rounded-lg border border-[#D1D5DB] border-dashed">
                <FileText className="w-10 h-10 text-gray-200 mx-auto mb-3" />
                <p className="text-[#6B7280] text-[11px] font-bold uppercase tracking-wider">No materials found for {selectedLevel}</p>
             </div>
           ) : (
             materials.map((m) => (
-              <div key={m.id}>
+              <div key={m?.id || Math.random().toString()}>
                 <MaterialCard 
                   material={m} 
-                  isViewed={history.some(h => h.materialId === m.id)}
+                  isViewed={history?.some(h => h?.materialId === m?.id) || false}
                   onClick={() => {
-                    setSelectedMaterial(m);
-                    recordViewing(m.id);
+                    if(m) {
+                      setSelectedMaterial(m);
+                      recordViewing(m.id);
+                    }
                   }} 
                 />
               </div>
@@ -94,13 +157,13 @@ export default function StudentArea({ profile }: { profile: UserProfile }) {
                {selectedMaterial ? (
                  <>
                    <div className="font-mono text-[11px] text-[#006838] bg-[#F0FDF4] px-2 py-1 rounded inline-block mb-3 border border-[#006838]/20">
-                     {selectedMaterial.title.split(':')[0] || 'DOCX_ACTIVE'}
+                     {selectedMaterial?.title?.split(':')[0] || 'DOCX_ACTIVE'}
                    </div>
                    <div className="ai-summary-box shadow-sm">
                       <p className="font-bold text-[#006838] mb-1">Summary Snapshot:</p>
-                      {selectedMaterial.summary || "Select a document from your catalog to generate an AI summary."}
+                      {selectedMaterial?.summary || "Select a document from your catalog to generate an AI summary."}
                    </div>
-                   {selectedMaterial.summary && (
+                   {selectedMaterial?.summary && (
                      <div className="mt-4 pt-4 border-t border-[#D1D5DB]">
                         <p className="text-[11px] font-bold text-[#6B7280] uppercase tracking-widest mb-3">Assessment Preview</p>
                         <div className="bg-white p-3 rounded border border-gray-100 text-[12px] italic text-[#4B5563] mb-4">
@@ -140,6 +203,7 @@ export default function StudentArea({ profile }: { profile: UserProfile }) {
 }
 
 function MaterialCard({ material, isViewed, onClick }: { material: Material, isViewed: boolean, onClick: () => void }) {
+  if (!material) return null;
   return (
     <div 
       onClick={onClick}
@@ -153,8 +217,8 @@ function MaterialCard({ material, isViewed, onClick }: { material: Material, isV
       </div>
       
       <div className="flex-1">
-        <h3 className="text-[13px] font-bold text-[#111827] line-clamp-1 mb-1">{material.title}</h3>
-        <p className="text-[11px] text-[#6B7280] line-clamp-2 leading-relaxed">{material.description}</p>
+        <h3 className="text-[13px] font-bold text-[#111827] line-clamp-1 mb-1">{material?.title || 'Untitled'}</h3>
+        <p className="text-[11px] text-[#6B7280] line-clamp-2 leading-relaxed">{material?.description || 'No description available.'}</p>
       </div>
 
       <div className="mt-4 flex items-center justify-between text-[10px] font-bold text-gray-300 group-hover:text-[#6B7280] transition-colors">
@@ -163,7 +227,7 @@ function MaterialCard({ material, isViewed, onClick }: { material: Material, isV
             <span>DEPT_LECTURER</span>
          </div>
          <div className="flex gap-1.5 font-sans">
-            {material.summary && <span className="text-[#006838] uppercase">Summary</span>}
+            {material?.summary && <span className="text-[#006838] uppercase">Summary</span>}
             <ChevronRight size={10} />
          </div>
       </div>
@@ -172,7 +236,7 @@ function MaterialCard({ material, isViewed, onClick }: { material: Material, isV
 }
 
 function MaterialDetailModal({ material, onClose, setMaterials }: { material: Material, onClose: () => void, setMaterials: React.Dispatch<React.SetStateAction<Material[]>> }) {
-  const [summary, setSummary] = useState(material.summary || "");
+  const [summary, setSummary] = useState(material?.summary || "");
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
   const [loadingQuiz, setLoadingQuiz] = useState(false);
@@ -181,35 +245,38 @@ function MaterialDetailModal({ material, onClose, setMaterials }: { material: Ma
   const [score, setScore] = useState(0);
 
   const handleGenerateSummary = async () => {
+    if (!material?.title || !material?.description) return;
     setLoadingSummary(true);
     try {
       const s = await generateSummary(`${material.title}: ${material.description}`);
       setSummary(s);
-      // Mock Update
-      setMaterials(prev => prev.map(m => m.id === material.id ? { ...m, summary: s } : m));
+      setMaterials(prev => prev?.map(m => m?.id === material?.id ? { ...m, summary: s } : m) || []);
     } catch (e) {
-      console.error(e);
+      console.error("Summary error:", e);
     } finally {
       setLoadingSummary(false);
     }
   };
 
   const handleGenerateQuiz = async () => {
-    if (quizQuestions.length > 0) {
+    if (!material?.title || !material?.description) return;
+    if (quizQuestions?.length > 0) {
       setShowQuiz(true);
       return;
     }
     setLoadingQuiz(true);
     try {
       const q = await generateQuiz(`${material.title}: ${material.description}`);
-      setQuizQuestions(q);
+      setQuizQuestions(q || []);
       setShowQuiz(true);
     } catch (e) {
-      console.error(e);
+      console.error("Quiz error:", e);
     } finally {
       setLoadingQuiz(false);
     }
   };
+
+  if (!material) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -224,7 +291,7 @@ function MaterialDetailModal({ material, onClose, setMaterials }: { material: Ma
              <div className="w-8 h-8 rounded bg-[#006838] flex items-center justify-center text-white">
                 <BookOpen size={16} />
              </div>
-             <h2 className="text-sm font-bold text-[#111827]">{material.title}</h2>
+             <h2 className="text-sm font-bold text-[#111827]">{material?.title || 'Document'}</h2>
           </div>
           <button onClick={onClose} className="text-[#6B7280] hover:text-[#111827]"><X size={18} /></button>
         </div>
@@ -234,14 +301,16 @@ function MaterialDetailModal({ material, onClose, setMaterials }: { material: Ma
              <div className="flex items-center justify-between mb-4">
                <div>
                   <h3 className="text-[11px] font-bold text-[#6B7280] uppercase tracking-widest">Document Overview</h3>
-                  <p className="text-sm text-[#374151] mt-1">{material.description}</p>
+                  <p className="text-sm text-[#374151] mt-1">{material?.description || 'No description available.'}</p>
                </div>
-               <a 
-                 href={material.fileUrl} target="_blank" rel="noreferrer"
-                 className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded text-[11px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors"
-               >
-                 <Download size={14} /> Download
-               </a>
+               {material?.fileUrl && material.fileUrl !== '#' && (
+                 <a 
+                   href={material.fileUrl} target="_blank" rel="noreferrer"
+                   className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded text-[11px] font-bold uppercase tracking-widest hover:bg-gray-200 transition-colors"
+                 >
+                   <Download size={14} /> Download
+                 </a>
+               )}
              </div>
            </section>
 
@@ -279,29 +348,29 @@ function MaterialDetailModal({ material, onClose, setMaterials }: { material: Ma
                       onClick={handleGenerateQuiz} disabled={loadingQuiz}
                       className="text-[#006838] font-bold text-[11px] uppercase tracking-wider hover:underline flex items-center gap-1"
                     >
-                      {loadingQuiz ? 'Assembling Quiz...' : (quizQuestions.length > 0 ? 'Review Quiz' : 'Assemble Quiz')}
+                      {loadingQuiz ? 'Assembling Quiz...' : (quizQuestions?.length > 0 ? 'Review Quiz' : 'Assemble Quiz')}
                       <ChevronRight size={12} />
                     </button>
                 </div>
 
                 {showQuiz && (
                   <div className="space-y-6 pt-4 border-t border-gray-100">
-                    {quizQuestions.map((q, idx) => (
+                    {quizQuestions?.map((q, idx) => (
                       <div key={idx} className="space-y-3">
                          <p className="text-[13px] font-semibold text-[#111827] flex gap-2">
                             <span className="text-[#006838]">Q{idx+1}.</span>
-                            {q.question}
+                            {q?.question || 'Unknown Question'}
                          </p>
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            {q.options.map((opt, oIdx) => (
+                            {q?.options?.map((opt, oIdx) => (
                               <button 
                                 key={oIdx}
                                 onClick={() => {
                                   if (completedQuiz) return;
-                                  if (oIdx === q.answerIndex) setScore(s => s + 1);
-                                  if (idx === quizQuestions.length - 1) setCompletedQuiz(true);
+                                  if (oIdx === q?.answerIndex) setScore(s => s + 1);
+                                  if (idx === (quizQuestions?.length || 0) - 1) setCompletedQuiz(true);
                                 }}
-                                className={`text-left p-2.5 rounded border text-[12px] transition-all ${completedQuiz ? (oIdx === q.answerIndex ? 'bg-[#DCFCE7] border-[#DCFCE7] text-[#166534]' : 'bg-gray-50 border-gray-100 text-[#6B7280]') : 'border-gray-100 hover:border-[#006838] hover:bg-[#F0FDF4]'}`}
+                                className={`text-left p-2.5 rounded border text-[12px] transition-all ${completedQuiz ? (oIdx === q?.answerIndex ? 'bg-[#DCFCE7] border-[#DCFCE7] text-[#166534]' : 'bg-gray-50 border-gray-100 text-[#6B7280]') : 'border-gray-100 hover:border-[#006838] hover:bg-[#F0FDF4]'}`}
                               >
                                 {opt}
                               </button>
@@ -313,7 +382,7 @@ function MaterialDetailModal({ material, onClose, setMaterials }: { material: Ma
                     {completedQuiz && (
                       <div className="bg-[#006838] text-white p-4 rounded-lg text-center">
                          <p className="text-[11px] font-bold uppercase tracking-[0.2em] mb-1">Assessment Complete</p>
-                         <p className="text-xl font-bold">Your Score: {score} / {quizQuestions.length}</p>
+                         <p className="text-xl font-bold">Your Score: {score} / {quizQuestions?.length || 0}</p>
                          <button 
                            onClick={() => { setCompletedQuiz(false); setScore(0); setShowQuiz(false); }}
                            className="mt-3 text-[10px] font-bold uppercase bg-white/20 px-4 py-1.5 rounded hover:bg-white/30 transition-all shadow-sm"

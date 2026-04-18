@@ -6,6 +6,7 @@ import {defineConfig, loadEnv} from 'vite';
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
+    base: '/',
     plugins: [react(), tailwindcss()],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
@@ -16,7 +17,8 @@ export default defineConfig(({mode}) => {
       },
     },
     build: {
-      chunkSizeWarningLimit: 2000,
+      target: 'es2015',
+      chunkSizeWarningLimit: 5000,
       minify: 'terser',
       terserOptions: {
         compress: {
@@ -28,22 +30,8 @@ export default defineConfig(({mode}) => {
         output: {
           manualChunks(id) {
             if (id.includes('node_modules')) {
-              if (id.includes('react') || id.includes('router')) {
-                return 'vendor-core';
-              }
-              if (id.includes('lucide') || id.includes('motion')) {
-                return 'vendor-ui';
-              }
-              if (id.includes('recharts') || id.includes('d3')) {
-                return 'vendor-charts';
-              }
-              return 'vendor';
-            }
-            if (id.includes('/src/components/ui/')) {
-              return 'ui-components';
-            }
-            if (id.includes('/src/services/')) {
-              return 'services';
+              // Extreme splitting: Every library gets its own chunk to minimize individual file impact
+              return id.toString().split('node_modules/')[1].split('/')[0].toString();
             }
           },
         },

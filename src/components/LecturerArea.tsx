@@ -3,10 +3,32 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Component, ReactNode } from "react";
 import { Material, AcademicLevel } from "../types";
-import { Upload, FileText, Trash2, CheckCircle2, X, Plus, Clock, BrainCircuit, Sparkles, BookCheck, Tags, FileUp } from "lucide-react";
+import { Upload, FileText, Trash2, CheckCircle2, X, Plus, Clock, BrainCircuit, Sparkles, BookCheck, Tags, FileUp, AlertTriangle, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+
+// Error Boundary for Lecturer Area to prevent full page white screens
+class LecturerErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean, error: Error | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 text-center bg-white rounded-xl border border-red-200">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-lg font-bold text-gray-900">Lecturer Dashboard Error</h2>
+          <p className="text-xs text-gray-500 mt-2">{this.state.error?.message}</p>
+          <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-red-50 text-red-600 rounded text-xs font-bold uppercase">Reload Dashboard</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const MOCK_MATERIALS: Material[] = [
   {
@@ -21,16 +43,50 @@ const MOCK_MATERIALS: Material[] = [
   }
 ];
 
-export default function LecturerArea() {
+export default function LecturerAreaWrapper() {
+  return (
+    <LecturerErrorBoundary>
+      <LecturerArea />
+    </LecturerErrorBoundary>
+  );
+}
+
+function LecturerArea() {
   const [materials, setMaterials] = useState<Material[]>(MOCK_MATERIALS);
   const [isUploading, setIsUploading] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    // Safety check with timeout to simulate safe data fetching
+    setIsLoaded(false);
+    const loadTimer = setTimeout(() => {
+      try {
+        setMaterials(MOCK_MATERIALS || []);
+      } catch (err) {
+        console.error("Dashboard load error:", err);
+      } finally {
+        setIsLoaded(true);
+      }
+    }, 300);
+    
+    return () => clearTimeout(loadTimer);
+  }, []);
 
   const deleteMaterial = async (id: string) => {
-    if (confirm("Permanently remove this courseware?")) {
-      setMaterials(prev => prev.filter(m => m.id !== id));
+    if (window.confirm("Permanently remove this courseware?")) {
+      setMaterials(prev => prev?.filter(m => m?.id !== id) || []);
     }
   };
+
+  if (!isLoaded) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 text-[#006838] animate-spin mb-4" />
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Loading Repository Data...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -57,12 +113,12 @@ export default function LecturerArea() {
         <section className="xl:col-span-2 space-y-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-xs font-black text-[#111827] uppercase tracking-widest flex items-center gap-2">
-              <FileUp size={14} /> My Repository ({materials.length})
+              <FileUp size={14} /> My Repository ({materials?.length || 0})
             </h3>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {materials.length === 0 ? (
+            {(!materials || materials.length === 0) ? (
               <div className="col-span-full py-20 text-center bg-white rounded-xl border-2 border-dashed border-[#D1D5DB] flex flex-col items-center">
                  <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
                     <FileText className="w-8 h-8 text-gray-300" />
@@ -76,9 +132,9 @@ export default function LecturerArea() {
                   layout
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  key={m.id}
+                  key={m?.id || Math.random().toString()}
                 >
-                  <LecturerCard material={m} onDelete={() => deleteMaterial(m.id)} />
+                  <LecturerCard material={m} onDelete={() => m?.id && deleteMaterial(m.id)} />
                 </motion.div>
               ))
             )}
@@ -91,7 +147,7 @@ export default function LecturerArea() {
                 <Sparkles size={14} className="text-[#006838]" /> Quick Analytics
               </h3>
               <div className="space-y-3">
-                 <AnalyticsRow label="Total Uploads" value={materials.length} />
+                 <AnalyticsRow label="Total Uploads" value={materials?.length || 0} />
                  <AnalyticsRow label="Student Views" value="842" />
                  <AnalyticsRow label="Storage Used" value="12.4 MB" />
               </div>
@@ -118,7 +174,7 @@ export default function LecturerArea() {
             onClose={() => setShowUpload(false)} 
             isUploading={isUploading} 
             setIsUploading={setIsUploading} 
-            onSuccess={(m) => setMaterials(prev => [m, ...prev])}
+            onSuccess={(m) => setMaterials(prev => [m, ...(prev || [])])}
           />
         )}
       </AnimatePresence>
@@ -136,6 +192,7 @@ function AnalyticsRow({ label, value }: { label: string, value: string | number 
 }
 
 function LecturerCard({ material, onDelete }: { material: Material, onDelete: () => void }) {
+  if (!material) return null;
   return (
     <div className="bg-white p-5 rounded-xl border border-[#D1D5DB] shadow-sm hover:shadow-md transition-all flex flex-col h-full group relative overflow-hidden">
       <div className="absolute top-0 left-0 w-1 h-full bg-[#006838]"></div>
@@ -156,25 +213,27 @@ function LecturerCard({ material, onDelete }: { material: Material, onDelete: ()
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-3">
           <span className="bg-[#006838] text-white text-[9px] font-black px-2 py-0.5 rounded uppercase tracking-widest">
-            {material.level}
+            {material?.level || 'N/A'}
           </span>
           <span className="text-[9px] font-bold text-[#6B7280] uppercase tracking-widest border-l border-gray-200 pl-2">
-            Code: {material.title.split(':')[0] || 'CSC'}
+            Code: {material?.title?.split(':')[0] || 'CSC'}
           </span>
         </div>
-        <h3 className="text-[13px] font-black text-[#111827] leading-snug group-hover:text-[#006838] transition-colors">{material.title}</h3>
+        <h3 className="text-[13px] font-black text-[#111827] leading-snug group-hover:text-[#006838] transition-colors">{material?.title || 'Untitled'}</h3>
         <p className="text-[11px] text-[#6B7280] mt-2 line-clamp-2 italic font-medium leading-relaxed">
-          "{material.description}"
+          "{material?.description || 'No description available'}"
         </p>
       </div>
 
       <div className="mt-5 pt-4 border-t border-gray-100 flex justify-between items-center bg-gray-50/50 -mx-5 -mb-5 px-5 py-3">
          <div className="flex items-center gap-1.5 text-[#6B7280]">
             <Clock size={11} className="opacity-50" />
-            <span className="text-[9px] font-bold uppercase tracking-widest">{new Date(material.createdAt).toLocaleDateString()}</span>
+            <span className="text-[9px] font-bold uppercase tracking-widest">
+              {material?.createdAt ? new Date(material.createdAt).toLocaleDateString() : 'Unknown Date'}
+            </span>
          </div>
          <div className="bg-white px-2 py-1 rounded border border-[#D1D5DB] text-[9px] font-bold text-[#006838] uppercase shadow-sm">
-            {material.semester} Semester
+            {material?.semester || 'First'} Semester
          </div>
       </div>
     </div>
@@ -202,21 +261,21 @@ function UploadModal({ onClose, isUploading, setIsUploading, onSuccess }: {
       const nextId = Math.random().toString(36).substr(2, 9);
       const newMaterial: Material = {
         id: nextId,
-        title: `${courseCode.toUpperCase()}: ${title}`,
-        description,
+        title: `${courseCode?.toUpperCase() || 'UNKNOWN'}: ${title || 'Untitled'}`,
+        description: description || '',
         fileUrl: "#",
-        level,
-        semester,
+        level: level || '100L',
+        semester: semester || 'First',
         lecturerId: "demo-lecturer",
         createdAt: new Date().toISOString()
       };
 
-      onSuccess(newMaterial);
-      onClose();
-    } catch (e) {
-      console.error("Upload failed", e);
+      if (onSuccess) onSuccess(newMaterial);
+      if (onClose) onClose();
+    } catch (err) {
+      console.error("Upload failed", err);
     } finally {
-      setIsUploading(false);
+      if (setIsUploading) setIsUploading(false);
     }
   };
 
@@ -238,7 +297,7 @@ function UploadModal({ onClose, isUploading, setIsUploading, onSuccess }: {
              <div className="space-y-1.5 flex flex-col">
                 <label className="text-[10px] font-black text-[#6B7280] uppercase tracking-widest">Course Code</label>
                 <input 
-                  required value={courseCode} onChange={e => setCourseCode(e.target.value)}
+                  required value={courseCode} onChange={e => setCourseCode(e?.target?.value || '')}
                   className="w-full bg-[#F9FAFB] border border-[#D1D5DB] px-3 py-2.5 rounded text-[11px] font-bold outline-none focus:ring-1 focus:ring-[#006838]/30 placeholder:text-gray-300"
                   placeholder="CSC 312"
                 />
@@ -246,7 +305,7 @@ function UploadModal({ onClose, isUploading, setIsUploading, onSuccess }: {
              <div className="col-span-2 space-y-1.5 flex flex-col">
                 <label className="text-[10px] font-black text-[#6B7280] uppercase tracking-widest">Material Title</label>
                 <input 
-                  required value={title} onChange={e => setTitle(e.target.value)}
+                  required value={title} onChange={e => setTitle(e?.target?.value || '')}
                   className="w-full bg-[#F9FAFB] border border-[#D1D5DB] px-3 py-2.5 rounded text-[11px] font-bold outline-none focus:ring-1 focus:ring-[#006838]/30"
                   placeholder="Intro to Distributed Systems"
                 />
@@ -256,7 +315,7 @@ function UploadModal({ onClose, isUploading, setIsUploading, onSuccess }: {
           <div className="space-y-1.5">
             <label className="text-[10px] font-black text-[#6B7280] uppercase tracking-widest">Publication Description</label>
             <textarea 
-              required value={description} onChange={e => setDescription(e.target.value)}
+              required value={description} onChange={e => setDescription(e?.target?.value || '')}
               className="w-full bg-[#F9FAFB] border border-[#D1D5DB] px-4 py-3 rounded text-[11px] font-medium outline-none focus:ring-1 focus:ring-[#006838]/30 h-28 resize-none leading-relaxed"
               placeholder="Provide a concise overview of this lecture module..."
             />
@@ -266,7 +325,7 @@ function UploadModal({ onClose, isUploading, setIsUploading, onSuccess }: {
              <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-[#6B7280] uppercase tracking-widest">Academic Year</label>
                 <select 
-                  value={level} onChange={(e) => setLevel(e.target.value as AcademicLevel)}
+                  value={level} onChange={(e) => setLevel(e?.target?.value as AcademicLevel)}
                   className="w-full bg-[#F9FAFB] border border-[#D1D5DB] px-3 py-2.5 rounded text-[11px] font-bold outline-none"
                 >
                   <option value="100L">100L (Freshman)</option>
@@ -279,7 +338,7 @@ function UploadModal({ onClose, isUploading, setIsUploading, onSuccess }: {
              <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-[#6B7280] uppercase tracking-widest">Portal Semester</label>
                 <select 
-                  value={semester} onChange={(e) => setSemester(e.target.value as any)}
+                  value={semester} onChange={(e) => setSemester(e?.target?.value as any)}
                   className="w-full bg-[#F9FAFB] border border-[#D1D5DB] px-3 py-2.5 rounded text-[11px] font-bold outline-none"
                 >
                   <option value="First">First Semester</option>
@@ -291,11 +350,11 @@ function UploadModal({ onClose, isUploading, setIsUploading, onSuccess }: {
           <div className="space-y-1.5">
             <label className="text-[10px] font-black text-[#6B7280] uppercase tracking-widest">Payload Selection</label>
             <div className="border-2 border-[#D1D5DB] border-dashed rounded-xl p-8 bg-[#F9FAFB] text-center relative hover:bg-[#E6F4EA] group transition-all cursor-pointer">
-               <input type="file" required onChange={e => setFile(e.target.files?.[0] || null)} className="absolute inset-0 opacity-0 cursor-pointer" />
+               <input type="file" required onChange={e => setFile(e?.target?.files?.[0] || null)} className="absolute inset-0 opacity-0 cursor-pointer" />
                <div className="flex flex-col items-center gap-2">
                  <FileUp className={`w-8 h-8 ${file ? 'text-[#006838]' : 'text-gray-300'} group-hover:scale-110 transition-transform`} />
                  <div className="text-[10px] font-bold uppercase tracking-widest text-[#6B7280]">
-                   {file ? <span className="text-[#006838] font-black">{file.name}</span> : 'Click or Drop PDF/DOCX'}
+                   {file ? <span className="text-[#006838] font-black">{file?.name}</span> : 'Click or Drop PDF/DOCX'}
                  </div>
                  <p className="text-[9px] text-gray-400 font-medium">Maximum permitted file size: 25MB</p>
                </div>
